@@ -105,20 +105,22 @@ class BedrockAugmentedLLM(AugmentedLLM[MessageUnionTypeDef, MessageUnionTypeDef]
             messages.append(message)
 
         response = await self.aggregator.list_tools()
-
-        tool_config: ToolConfigurationTypeDef = {
-            "tools": [
-                {
-                    "toolSpec": {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "inputSchema": {"json": tool.inputSchema},
+        
+        tool_config: ToolConfigurationTypeDef | None = None
+        if response.tools:
+            tool_config = {
+                "tools": [
+                    {
+                        "toolSpec": {
+                            "name": tool.name,
+                            "description": tool.description,
+                            "inputSchema": {"json": tool.inputSchema},
+                        }
                     }
-                }
-                for tool in response.tools
-            ],
-            "toolChoice": {"auto": {}},
-        }
+                    for tool in response.tools
+                ],
+                "toolChoice": {"auto": {}},
+            }
 
         responses: list[MessageUnionTypeDef] = []
         model = await self.select_model(params)
@@ -141,8 +143,12 @@ class BedrockAugmentedLLM(AugmentedLLM[MessageUnionTypeDef, MessageUnionTypeDef]
                 "messages": messages,
                 "system": system_content,
                 "inferenceConfig": inference_config,
-                "toolConfig": tool_config,
             }
+            if tool_config:
+                arguments = {
+                    **arguments,
+                    "toolConfig": tool_config,
+                }
 
             if params.metadata:
                 arguments = {
